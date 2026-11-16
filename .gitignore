@@ -1,0 +1,15 @@
+# build products (make clean)
+sha1_find
+sha1_find_cuda
+sha1_find_mpi
+sha1_server
+sha1_client
+sha1_cpu_tests
+sha1_cuda_test
+parse_png
+a.out
+*.cubin
+sha1_find_wasm.js
+sha1_find_wasm.wasm
+# deliverable archive
+*.tgz
