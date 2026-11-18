@@ -13,3 +13,11 @@ sha1_find_wasm.js
 sha1_find_wasm.wasm
 # deliverable archive
 *.tgz
+sha1_find_opencl
+sha1_find_ispc
+sha1_ispc.o
+sha1_ispc_ispc.h
+sha1_web_simd.js
+sha1_web_simd.wasm
+sha1_web_scalar.js
+sha1_web_scalar.wasm

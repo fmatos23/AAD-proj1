@@ -14,20 +14,28 @@
 
 __attribute__((unused))
 static void cpu_name(char *name,size_t size)
-{
+{ // "model name" (x86 and some ARM kernels), else "Hardware" (Android) or "CPU part" (other ARM)
+  static const char *keys[3] = { "model name","Hardware","CPU part" };
   char line[256];
-  FILE *fp = fopen("/proc/cpuinfo","r");
 
   snprintf(name,size,"unknown");
-  while(fp != NULL && fgets(line,sizeof(line),fp) != NULL)
-    if(strncmp(line,"model name",10) == 0 && strchr(line,':') != NULL)
-    {
-      snprintf(name,size,"%s",strchr(line,':') + 2);
-      name[strcspn(name,"\n")] = '\0';
-      break;
-    }
-  if(fp != NULL)
-    fclose(fp);
+  for(int k = 0;k < 3;k++)
+  {
+    FILE *fp = fopen("/proc/cpuinfo","r");
+    int found = 0;
+
+    while(fp != NULL && !found && fgets(line,sizeof(line),fp) != NULL)
+      if(strncmp(line,keys[k],strlen(keys[k])) == 0 && strchr(line,':') != NULL)
+      {
+        snprintf(name,size,"%s%s",(k == 2) ? "ARM CPU part " : "",strchr(line,':') + 2);
+        name[strcspn(name,"\n")] = '\0';
+        found = 1;
+      }
+    if(fp != NULL)
+      fclose(fp);
+    if(found)
+      return;
+  }
 }
 
 // CPU package energy (RAPL, microjoules); -1 if not readable (usually root only)

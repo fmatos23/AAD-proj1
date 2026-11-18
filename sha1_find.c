@@ -8,10 +8,13 @@
 //   sha1_find [-e engine] [-t threads] -b seconds [-c csv] input
 //                                                                benchmark (count attempts during the given time)
 //   sha1_find -e engine -T n_tests input                         compare a SIMD engine with the scalar one
-//                                                                (cuda: run n_tests seconds, check every GPU solution on the CPU)
+//                                                                (cuda/opencl: run n_tests seconds, check every GPU solution on the CPU)
+//   sha1_find_opencl -L                                          list the OpenCL platforms and devices
 //
 // engines: scalar, avx, avx2, avx512f, neon, wasm_simd (the ones supported by the compiler flags),
-//          cuda (only in sha1_find_cuda, compiled with -DWITH_CUDA)
+//          sha_ni (Intel/AMD SHA instructions), neon_sha1 (ARMv8 SHA1 instructions),
+//          cuda (only in sha1_find_cuda, compiled with -DWITH_CUDA),
+//          opencl (only in sha1_find_opencl, compiled with -DWITH_OPENCL)
 // threads: 1 (default), n, or 0 (all available) --- OpenMP, CPU engines only
 // formats: PDF, PNG, PPM, ZIP (detected from the file contents)
 //
@@ -44,6 +47,10 @@ static void usage(const char *prog)
   exit(1);
 }
 
+#ifdef __EMSCRIPTEN__
+# include "sha1_wasm_main.h" // works around a broken emscripten package (see the file)
+#endif
+
 int main(int argc,char **argv)
 {
   const char *engine = "scalar",*csv = NULL;
@@ -59,9 +66,12 @@ int main(int argc,char **argv)
   u32_t h[5],g[5];
   int opt;
 
-  while((opt = getopt(argc,argv,"e:b:c:z:T:t:")) != -1)
+  while((opt = getopt(argc,argv,"e:b:c:z:T:t:L")) != -1)
     switch(opt)
     {
+#ifdef WITH_OPENCL
+      case 'L': opencl_list_devices(); return 0;
+#endif
       case 'e': engine = optarg; break;
       case 'b': bench_seconds = atof(optarg); break;
       case 'c': csv = optarg; break;
@@ -126,7 +136,16 @@ int main(int argc,char **argv)
     if(e->n_threads > 1)
       device = cuda_device_name; // GPU name for the cuda engine
 #endif
-    return (csv_append(csv,label,t.format,device,n_threads * e->n_threads,e->n_lanes,s->n_chunks,&res,
+#ifdef WITH_OPENCL
+    if(e->n_threads > 1)
+      device = opencl_device_name; // device name for the opencl engine
+#endif
+    int n_reported = n_threads * e->n_threads;
+#ifdef WITH_OPENCL
+    if(strcmp(engine,"opencl") == 0)
+      n_reported = (int)opencl_last_global; // work-items per launch (adaptive)
+#endif
+    return (csv_append(csv,label,t.format,device,n_reported,e->n_lanes,s->n_chunks,&res,
                        (e0 >= 0.0 && e1 >= e0) ? e1 - e0 : -1.0) == 0) ? 0 : 1;
   }
   if(!res.found)

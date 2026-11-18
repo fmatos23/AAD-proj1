@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>AAD A1 — SHA1 search in the browser (WebAssembly)</title>
+<!--
+  Arquiteturas de Alto Desempenho 2026/2027 --- assignment A1
+
+  runs sha1_find, compiled to WebAssembly, inside the browser (any computer, phone or tablet)
+    * benchmark: N Web Workers (one per core) run the search engine for some seconds
+    * search: modify a file so that its SHA1 ends with zero bits, then download it
+
+  the page must be served by a web server (browsers do not load WebAssembly from file:// URLs):
+    make sha1_web
+    python3 -m http.server 8000
+  and then open http://localhost:8000/sha1_web.html (on another device of the same network use
+  http://<IP address of this computer>:8000/sha1_web.html; see hostname -I)
+-->
+<style>
+  :root { --bg: #fcfcfb; --fg: #0b0b0b; --muted: #52514e; --line: #e6e5e1; --accent: #2a78d6; --ok: #008300; --bad: #e34948; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1a1a19; --fg: #f0efec; --muted: #c3c2b7; --line: #3a3936; --accent: #3987e5; --ok: #0ca30c; --bad: #e66767; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 21px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 18px; color: var(--muted); }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; min-width: 0; }
+  select, input[type=file] { max-width: 100%; }
+  #caps { overflow-wrap: anywhere; }
+  label { flex-wrap: wrap; max-width: 100%; }
+  legend { padding: 0 6px; color: var(--muted); font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 4px 0; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  input[type=number] { width: 80px; }
+  input[type=text] { width: 100%; max-width: 420px; }
+  input, select, button { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  button { cursor: pointer; background: var(--accent); color: #fff; border: 0; padding: 8px 16px; }
+  button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  #log { white-space: pre-wrap; font: 12.5px/1.4 ui-monospace, Menlo, Consolas, monospace; background: color-mix(in srgb, var(--fg) 5%, transparent);
+         border-radius: 8px; padding: 10px 12px; min-height: 120px; max-height: 340px; overflow: auto; margin: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 6px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .status { margin: 8px 0; color: var(--muted); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SHA1 search in the browser</h1>
+  <p class="sub">AAD 2026/2027, assignment A1 — <code>sha1_find</code> compiled to WebAssembly, running in Web Workers.</p>
+
+  <fieldset>
+    <legend>This device</legend>
+    <div class="row"><span id="caps"></span></div>
+    <div class="row"><label style="width:100%">Name for the CSV file <input type="text" id="device"></label></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Input file</legend>
+    <div class="row">
+      <label><input type="radio" name="src" value="example" checked> example
+        <select id="example">
+          <option value="examples/deti_4_2_37_original.pdf">PDF — deti_4_2_37_original.pdf</option>
+          <option value="examples/example_frame_001_original.png">PNG — example_frame_001_original.png</option>
+          <option value="examples/example_frame_001.ppm">PPM — example_frame_001.ppm</option>
+          <option value="results/sample_original.zip">ZIP — sample_original.zip</option>
+        </select></label>
+      <label><input type="radio" name="src" value="upload"> my file <input type="file" id="upload" accept=".pdf,.png,.ppm,.zip"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>What to do</legend>
+    <div class="row">
+      <label><input type="radio" name="mode" value="bench" checked> benchmark for <input type="number" id="seconds" value="60" min="1" max="3600"> s</label>
+      <label>with <input type="number" id="workers" value="1" min="1" max="256"> worker(s)</label>
+      <button class="secondary" type="button" id="allcores">use all cores</button>
+    </div>
+    <div class="row">
+      <label><input type="radio" name="mode" value="search"> search a file whose SHA1 ends with <input type="number" id="zeros" value="32" min="1" max="32"> zero bits</label>
+    </div>
+    <div class="row">
+      <label>engine <select id="engine"></select></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" id="run">Run</button>
+      <button type="button" class="secondary" id="stop" disabled>Stop</button>
+      <a id="download" class="hidden"></a>
+    </div>
+    <div class="status" id="status">Ready.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Results (this session)</legend>
+    <table>
+      <thead><tr><th>engine</th><th>file</th><th>workers</th><th class="num">seconds</th><th class="num">attempts/min</th></tr></thead>
+      <tbody id="results"></tbody>
+    </table>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="secondary" id="csv" disabled>Download CSV</button>
+      <span class="status">same columns as <code>run_benchmarks.sh</code>, ready to append to the other results</span>
+    </div>
+  </fieldset>
+
+  <pre id="log"></pre>
+</main>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const CSV_HEADER = "version,format,host,device,threads,lanes,tail_chunks,seconds,attempts,attempts_per_min,chunk_updates_per_min,energy_J,gpu_energy_J";
+// tiny WebAssembly module that uses a SIMD instruction (it only validates if SIMD is supported)
+const SIMD_TEST = new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11]);
+const hasSimd = WebAssembly.validate(SIMD_TEST);
+const exp = (x) => x.toExponential(6).replace(/e([+-])(\d)$/, "e$10$2"); // same format as the C programs (1.234560e+09)
+const cores = navigator.hardwareConcurrency || 1;
+let workers = [], csvLines = [], running = false;
+
+function log(text) { const el = $("log"); el.textContent += text + "\n"; el.scrollTop = el.scrollHeight; }
+function setStatus(text, cls) { const el = $("status"); el.textContent = text; el.className = "status " + (cls || ""); }
+
+function guessDevice()
+{
+  const ua = navigator.userAgent;
+  let os = /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "unknown OS";
+  let br = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "browser";
+  return os + ", " + br + ", " + cores + " logical cores";
+}
+
+function init()
+{
+  $("caps").innerHTML = "WebAssembly SIMD: <b class='" + (hasSimd ? "ok'>yes" : "bad'>no") + "</b> · " + cores + " logical cores · " + navigator.userAgent.replace(/[<>&]/g, "");
+  $("device").value = guessDevice();
+  const eng = $("engine");
+  if(hasSimd) eng.add(new Option("wasm_simd (4 lanes, WebAssembly SIMD)", "wasm_simd"));
+  eng.add(new Option("scalar (no SIMD)", "scalar"));
+  $("allcores").onclick = () => { $("workers").value = cores; };
+  $("run").onclick = run;
+  $("stop").onclick = stop;
+  $("csv").onclick = downloadCsv;
+  if(location.protocol === "file:")
+    setStatus("This page must be opened through a web server (python3 -m http.server 8000), not as a file.", "bad");
+}
+
+async function getInput()
+{
+  if(document.querySelector("input[name=src]:checked").value === "upload")
+  {
+    const f = $("upload").files[0];
+    if(!f) throw new Error("choose a file first");
+    return { name: f.name.replace(/[^A-Za-z0-9._-]/g, "_"), bytes: await f.arrayBuffer() };
+  }
+  const url = $("example").value;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("unable to fetch " + url + " (HTTP " + r.status + ")");
+  return { name: url.split("/").pop(), bytes: await r.arrayBuffer() };
+}
+
+function runWorker(job)
+{ // returns a promise with the "done" message of the worker
+  return new Promise((resolve, reject) => {
+    const w = new Worker("sha1_web_worker.js");
+    w.reject = reject; // used by stop()
+    workers.push(w);
+    w.onmessage = (ev) => {
+      const m = ev.data;
+      if(m.type === "line") log(m.text);
+      else if(m.type === "done") { w.terminate(); resolve(m); }
+      else if(m.type === "error") { w.terminate(); reject(new Error(m.text)); }
+    };
+    w.onerror = (e) => { w.terminate(); reject(new Error(e.message || "worker error")); };
+    w.postMessage(job, [ job.input.bytes ]);
+  });
+}
+
+async function run()
+{
+  if(running) return;
+  const mode = document.querySelector("input[name=mode]:checked").value;
+  const engine = $("engine").value;
+  const build = (engine === "wasm_simd") ? "sha1_web_simd.js" : "sha1_web_scalar.js";
+  let input;
+  running = true; $("run").disabled = true; $("stop").disabled = false;
+  try { input = await getInput(); } catch(e) { setStatus(e.message, "bad"); stop(); return; }
+  $("download").className = "hidden";
+  try
+  {
+    if(mode === "bench")
+    {
+      const n = Math.max(1, Math.min(256, parseInt($("workers").value) || 1));
+      const secs = Math.max(1, parseFloat($("seconds").value) || 60);
+      setStatus("Benchmark running: " + n + " worker(s) x " + secs + " s ...");
+      log("== benchmark " + engine + ", " + input.name + ", " + n + " worker(s), " + secs + " s");
+      const jobs = [];
+      for(let k = 0; k < n; k++)
+        jobs.push(runWorker({ build: build, input: { name: input.name, bytes: input.bytes.slice(0) },
+                              args: [ "-e", engine, "-b", String(secs), "-c", "/results.csv", input.name ], output: null }));
+      const res = await Promise.all(jobs);
+      addBenchmark(engine, n, res);
+    }
+    else
+    {
+      const z = Math.max(1, Math.min(32, parseInt($("zeros").value) || 32));
+      const out = input.name.replace(/(\.[^.]*)?$/, "_final$1");
+      setStatus("Searching (" + z + " zero bits) ... this may take a while");
+      log("== search " + engine + ", " + input.name + ", " + z + " zero bits");
+      const t0 = performance.now();
+      const m = await runWorker({ build: build, input: input, args: [ "-e", engine, "-z", String(z), input.name, out ], output: out });
+      if(m.status === 0 && m.output)
+      {
+        const digest = await crypto.subtle.digest("SHA-1", m.output).catch(() => null);
+        const hex = digest ? Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("") : "(crypto.subtle needs https or localhost)";
+        const a = $("download");
+        a.href = URL.createObjectURL(new Blob([ m.output ]));
+        a.download = out; a.textContent = "Download " + out; a.className = "";
+        setStatus("Found in " + ((performance.now() - t0) / 1000).toFixed(1) + " s, SHA1 (checked by the browser) = " + hex, "ok");
+      }
+      else
+        setStatus("No solution (exit status " + m.status + ")", "bad");
+    }
+  }
+  catch(e) { if(e.message === "stopped") setStatus("Stopped."); else { setStatus(e.message, "bad"); log("error: " + e.message); } }
+  finally { stop(); }
+}
+
+function addBenchmark(engine, n, res)
+{ // combine the CSV lines of the workers into one line (sum of the rates of the workers)
+  let attempts = 0, seconds = 0, rate = 0, fields = null;
+  for(const m of res)
+  {
+    if(!m.csv) continue;
+    const line = m.csv.trim().split("\n").pop();
+    const f = line.match(/("[^"]*"|[^,]*)(,|$)/g).map(x => x.replace(/,$/, ""));
+    fields = f;
+    attempts += Number(f[8]); seconds = Math.max(seconds, Number(f[7])); rate += Number(f[9]);
+  }
+  if(!fields) { setStatus("The benchmark produced no results", "bad"); return; }
+  const fmt = fields[1], lanes = fields[5], chunks = Number(fields[6]);
+  const version = "web_" + engine + (n > 1 ? "+workers" : "");
+  const device = '"' + $("device").value.replace(/"/g, "'") + '"';
+  csvLines.push([ version, fmt, "browser", device, n, lanes, chunks, seconds.toFixed(3), attempts,
+                  exp(rate), exp(rate * chunks), "", "" ].join(","));
+  const tr = document.createElement("tr");
+  tr.innerHTML = "<td>" + version + "</td><td>" + fmt + "</td><td>" + n + "</td><td class='num'>" + seconds.toFixed(1) +
+                 "</td><td class='num'>" + (rate / 1e9).toFixed(3) + " × 10⁹</td>";
+  $("results").appendChild(tr);
+  $("csv").disabled = false;
+  setStatus("Done: " + (rate / 1e9).toFixed(3) + " × 10⁹ attempts/min (" + n + " worker" + (n > 1 ? "s" : "") + ")", "ok");
+}
+
+function stop()
+{
+  const ws = workers;
+  workers = [];
+  for(const w of ws) { w.terminate(); w.reject(new Error("stopped")); } // (no effect on finished workers)
+  running = false; $("run").disabled = false; $("stop").disabled = true;
+}
+
+function downloadCsv()
+{
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ CSV_HEADER + "\n" + csvLines.join("\n") + "\n" ], { type: "text/csv" }));
+  a.download = "bench_browser.csv";
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>

@@ -105,8 +105,15 @@ static void run_scalar(search_t *s,double max_seconds,int bench,u32_t mask,resul
 //
 
 #include "sha1_simd.h"
+#include "sha1_shani.h"
+#ifdef WITH_ISPC
+# include "sha1_ispc.h"
+#endif
 #ifdef WITH_CUDA
 # include "sha1_cuda_host.h"
+#endif
+#ifdef WITH_OPENCL
+# include "sha1_opencl_host.h"
 #endif
 
 typedef struct
@@ -135,11 +142,23 @@ static const engine_t engines[] =
 #if defined(__ARM_NEON)
   { "neon"     , 4,1,run_neon     ,test_neon      },
 #endif
+#if defined(__SHA__) && defined(__SSE4_1__)
+  { "sha_ni"   ,SHA_LANES,1,run_sha_ni   ,test_sha_ni    },
+#endif
+#if defined(__ARM_NEON) && (defined(__ARM_FEATURE_SHA2) || defined(__ARM_FEATURE_CRYPTO))
+  { "neon_sha1",SHA_LANES,1,run_neon_sha1,test_neon_sha1 },
+#endif
+#ifdef WITH_ISPC
+  { "ispc"     ,ISPC_LANES,1,run_ispc    ,test_ispc      },
+#endif
 #if defined(__wasm_simd128__)
   { "wasm_simd", 4,1,run_wasm_simd,test_wasm_simd },
 #endif
 #ifdef WITH_CUDA
   { "cuda"     , 1,(int)CUDA_THREADS,run_cuda,test_cuda },
+#endif
+#ifdef WITH_OPENCL
+  { "opencl"   , 1,(int)OCL_THREADS_DEF,run_opencl,test_opencl },
 #endif
 };
 

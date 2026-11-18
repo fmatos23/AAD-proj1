@@ -54,25 +54,34 @@ static void drop_client(client_t *c)
 }
 
 static int listen_on(const char *port)
-{
-  struct addrinfo hints,*ai;
-  int fd,one = 1;
+{ // an IPv6 socket that also accepts IPv4 clients; plain IPv4 if the system has no IPv6
+  static const int families[2] = { AF_INET6,AF_INET };
 
-  memset(&hints,0,sizeof(hints));
-  hints.ai_family = AF_INET6;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;
-  if(getaddrinfo(NULL,port,&hints,&ai) != 0)
-    return -1;
-  fd = socket(ai->ai_family,ai->ai_socktype,0);
-  if(fd < 0 || setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one)) != 0 || bind(fd,ai->ai_addr,ai->ai_addrlen) != 0 || listen(fd,16) != 0)
+  for(int k = 0;k < 2;k++)
   {
-    perror("listen_on");
+    struct addrinfo hints,*ai;
+    int fd,one = 1,zero = 0;
+
+    memset(&hints,0,sizeof(hints));
+    hints.ai_family = families[k];
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    if(getaddrinfo(NULL,port,&hints,&ai) != 0)
+      continue;
+    fd = socket(ai->ai_family,ai->ai_socktype,0);
+    if(fd >= 0 && families[k] == AF_INET6)
+      (void)setsockopt(fd,IPPROTO_IPV6,IPV6_V6ONLY,&zero,sizeof(zero)); // dual stack (the default is not always so)
+    if(fd >= 0 && setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one)) == 0 && bind(fd,ai->ai_addr,ai->ai_addrlen) == 0 && listen(fd,16) == 0)
+    {
+      freeaddrinfo(ai);
+      return fd;
+    }
+    if(fd >= 0)
+      close(fd);
     freeaddrinfo(ai);
-    return -1;
   }
-  freeaddrinfo(ai);
-  return fd; // IPv6 socket, also accepts IPv4 clients
+  perror("listen_on");
+  return -1;
 }
 
 static void usage(const char *prog)

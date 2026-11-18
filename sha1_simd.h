@@ -41,6 +41,7 @@ lanes_t;
 // digit p (0 <= p < k) of lane j
 //
 
+__attribute__((unused))
 static u32_t lane_digit(const search_t *s,int base,int k,int j,int p)
 {
   for(int q = base + k - 1;q > p;q--)
@@ -56,6 +57,7 @@ static u32_t lane_digit(const search_t *s,int base,int k,int j,int p)
 // return value: 0 (success), -1 (too few variable bytes)
 //
 
+__attribute__((unused))
 static int lanes_init(search_t *s,lanes_t *L,int n_lanes)
 {
   int k,capacity = 1,last,b;
@@ -111,6 +113,7 @@ static int lanes_init(search_t *s,lanes_t *L,int n_lanes)
 // put the lane digits of lane j into the common tail (j = 0 restores them to lo[])
 //
 
+__attribute__((unused))
 static void lanes_apply(search_t *s,const lanes_t *L,int j)
 {
   for(int p = L->base;p < L->base + L->k;p++)
