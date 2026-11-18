@@ -23,6 +23,7 @@
 #   gpu_energy_J : average nvidia-smi power.draw (sampled every 200 ms) x time (cuda only)
 #
 set -e
+export LC_ALL=C # numbers with a decimal point (a pt_PT locale makes awk print "1630,444", which breaks the CSV)
 cd "$(dirname "$0")"
 SECONDS_PER_RUN=${1:-60}
 CSV=${2:-benchmarks.csv}

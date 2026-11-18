@@ -1,0 +1,8 @@
+version,format,host,device,threads,lanes,tail_chunks,seconds,attempts,attempts_per_min,chunk_updates_per_min,energy_J,gpu_energy_J
+web_wasm_simd,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, Modo de Pouca Energia",1,4,1,60.015,358612992,3.585234e+08,3.585234e+08,,
+web_scalar,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, Modo de Pouca Energia",1,1,1,60.020,193855488,1.937909e+08,1.937909e+08,,
+web_wasm_simd+workers,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, Modo de Pouca Energia",4,4,1,60.005,1173553152,1.173485e+09,1.173485e+09,,
+web_wasm_simd,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, a carregar",1,4,1,60.000,644874240,6.448742e+08,6.448742e+08,,
+web_wasm_simd+workers,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, a carregar",4,4,1,60.011,1413283840,1.413078e+09,1.413078e+09,,
+web_scalar,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, a carregar",1,1,1,60.001,335478784,3.354732e+08,3.354732e+08,,
+web_wasm_simd+workers,pdf,browser,"iPhone 12 (Apple A14), iOS Safari, a carregar",6,4,1,60.008,1827995648,1.827864e+09,1.827864e+09,,

@@ -152,3 +152,17 @@ e as mesmas versões do `apt` (gcc 13, ispc 1.22, emscripten 3.1.6):
   mexido.
 - **`./run_benchmarks.sh 2`** com todos os grupos (exceto `cuda`, por não haver GPU NVIDIA):
   55 linhas, todas com 13 colunas.
+
+## O filme ("awesome")
+
+```bash
+./make_movie.sh                       # 4 s do Jogo da Vida (96 frames), gerado pelo ffmpeg
+./make_movie.sh video.mp4 4           # ou: os primeiros 4 s de um vídeo teu (por exemplo do telemóvel)
+```
+
+O script escolhe sozinho o motor mais rápido (OpenCL, depois CUDA, depois todos os núcleos do CPU) e
+segue os passos do professor: extrai os frames PPM, procura cada um, monta o filme FFV1 sem perdas,
+volta a extrair os frames do filme e compara-os, e verifica todos com `verify_files.py`.
+Resultado: `movie/aad_movie.mkv` (é este que se entrega) e `movie/aad_movie_preview.mp4` (só para
+mostrar nos slides; o MP4 tem perdas, por isso os frames dele não mantêm os hashes).
+Teste rápido do processo todo (16 bits em vez de 32): `ZBITS=16 ./make_movie.sh`.

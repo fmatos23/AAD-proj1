@@ -21,3 +21,6 @@ sha1_web_simd.js
 sha1_web_simd.wasm
 sha1_web_scalar.js
 sha1_web_scalar.wasm
+movie/original/
+movie/x/
+movie/y/
