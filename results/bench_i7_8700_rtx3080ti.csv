@@ -1,0 +1,9 @@
+version,format,host,device,threads,lanes,tail_chunks,seconds,attempts,attempts_per_min,chunk_updates_per_min,energy_J,gpu_energy_J
+cuda,pdf,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",65536,1,1,60.067,772669440000,7.718029e+11,7.718029e+11,,18719.428
+cuda,png,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",65536,1,1,60.094,654704640000,6.536853e+11,6.536853e+11,,14744.524
+cuda,ppm,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",65536,1,1,60.091,611227533312,6.102996e+11,6.102996e+11,,13453.963
+cuda,zip,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",65536,1,1,60.082,586547200000,5.857442e+11,5.857442e+11,,13009.619
+opencl,pdf,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",131072,1,1,60.181,570152960000,5.684407e+11,5.684407e+11,,
+opencl,png,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",131072,1,1,60.157,597678080000,5.961151e+11,5.961151e+11,,
+opencl,ppm,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",262144,1,1,60.144,596996259840,5.955670e+11,5.955670e+11,,
+opencl,zip,duarte-lourenco-PC,"NVIDIA GeForce RTX 3080 Ti",131072,1,1,60.167,589813760000,5.881784e+11,5.881784e+11,,

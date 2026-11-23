@@ -1,0 +1,4 @@
+version,format,host,device,threads,lanes,tail_chunks,seconds,attempts,attempts_per_min,chunk_updates_per_min,energy_J,gpu_energy_J
+server+clients,pdf,duarte-lourenco-PC,"distributed: i7-8700",12,8,1,60.014,16409261856,1.640550e+10,1.640550e+10,,
+server+clients,pdf,duarte-lourenco-PC,"distributed: i7-8700 + Ryzen 7 6800H",28,8,1,60.041,41151243376,4.112339e+10,4.112339e+10,,
+server+clients,pdf,duarte-lourenco-PC,"distributed: i7-8700 + Ryzen 7 6800H + i7-1280P",48,8,1,60.149,61511295384,6.135914e+10,6.135914e+10,,
